@@ -1,14 +1,8 @@
 package com.data.generator.application;
 
 import jakarta.servlet.http.HttpServletRequest;
-import javassist.CannotCompileException;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.CtNewMethod;
-import javassist.NotFoundException;
+import javassist.*;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -28,8 +22,14 @@ public class Project {
 
         ClassPool classPool = ClassPool.getDefault();
         String className = parameters.get("className")[0];
+        String[] classesToImport = parameters.get("importClass");
+
+        for(int i = 0; i < (classesToImport != null ? classesToImport.length : 0); i++) {
+            classPool.importPackage(classesToImport[i]);
+        }
+
         CtClass newClass = classPool.makeClass(className);
-        newClass.setModifiers(1);
+        newClass.defrost();
 
         String response = "package: " + newClass.getPackageName()
                 + "class: " + newClass.getName();
@@ -46,11 +46,10 @@ public class Project {
 
         ClassPool classPool = ClassPool.getDefault();
         CtClass existingClass = classPool.getCtClass(className);
+        existingClass.defrost();
 
         CtMethod newMethod = CtNewMethod.make(method, existingClass);
         existingClass.addMethod(newMethod);
-
-        existingClass.setModifiers(1);
 
         return "Method Defined.";
     }
@@ -65,15 +64,15 @@ public class Project {
         ClassPool classPool = ClassPool.getDefault();
         CtClass existingClass = classPool.getCtClass(className);
 
-        ClassLoader loader = new CustomClassLoader();
-        Class<?> definedClass = ((CustomClassLoader) loader).defineClass(existingClass.getName(), existingClass.toBytecode());
+        CustomClassLoader loader = new CustomClassLoader();
+        Class<?> definedClass = loader.defineClass(existingClass.getName(), existingClass.toBytecode());
 
         Object obj = definedClass.newInstance();
         Method methodIn = definedClass.getMethod(method);
 
-        existingClass.setModifiers(1);
-
         methodIn.invoke(obj);
+        System.gc();
+        existingClass.defrost();
         return "Method Executed";
     }
 
